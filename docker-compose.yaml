@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: airflow
+    volumes:
+      - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    restart: always
+
+  mongo:
+    image: mongo:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: mongo
+    volumes:
+      - mongo-db-volume:/data/db
+    ports:
+      - 27017:27017
+    restart: always
+
+  airflow-webserver:
+    image: apache/airflow:2.7.1
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=admin
+      - _AIRFLOW_WWW_USER_EMAIL=admin@example.com
+      - _PIP_ADDITIONAL_PACKAGES=pymongo psycopg2-binary pandas sqlalchemy
+    volumes:
+      - ./dags:/opt/airflow/dags
+    ports:
+      - "8080:8080"
+    command: >
+      bash -c "sleep 20 && 
+      airflow db migrate && 
+      airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@example.com --password admin || true && 
+      airflow webserver"
+
+  airflow-scheduler:
+    image: apache/airflow:2.7.1
+    depends_on:
+      - postgres
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgres@postgres:5432/airflow
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - _PIP_ADDITIONAL_PACKAGES=pymongo psycopg2-binary pandas sqlalchemy
+    volumes:
+      - ./dags:/opt/airflow/dags
+    command: >
+      bash -c "sleep 25 && airflow scheduler"
+
+volumes:
+  postgres-db-volume:
+  mongo-db-volume:
+
